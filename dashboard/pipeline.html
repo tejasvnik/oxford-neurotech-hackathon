@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MindCart Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f7f9; --surface:#fff; --line:#e4e7ec; --line-2:#eef0f3; --text:#101828; --text-2:#475467; --muted:#98a2b3;
+  --accent:#3e4fd8; --accent-soft:#eef0ff; --pos:#12805c; --pos-soft:#e8f6f0; --warn:#b54708; --warn-soft:#fff4e5; --bad:#c01048; --bad-soft:#fff1f3;
+  --raw:#98a2b3; --delta:#7a5af8; --theta:#3e4fd8; --alpha:#12805c; --beta:#b54708; --trace:#344054; --shadow:0 1px 2px rgba(16,24,40,.05);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c111d; --surface:#141a29; --line:#232a3b; --line-2:#1b2233; --text:#f2f4f7; --text-2:#b4bccb; --muted:#6b7588;
+  --accent:#7b8cff; --accent-soft:#1d2445; --pos:#3ccf91; --pos-soft:#11291f; --warn:#f5a524; --warn-soft:#2d2210; --bad:#ff6b8a; --bad-soft:#2d1219;
+  --raw:#59637a; --delta:#a48bff; --theta:#7b8cff; --alpha:#3ccf91; --beta:#f5a524; --trace:#c2c9d6; --shadow:none}}
+:root[data-theme="dark"]{--bg:#0c111d; --surface:#141a29; --line:#232a3b; --line-2:#1b2233; --text:#f2f4f7; --text-2:#b4bccb; --muted:#6b7588;
+  --accent:#7b8cff; --accent-soft:#1d2445; --pos:#3ccf91; --pos-soft:#11291f; --warn:#f5a524; --warn-soft:#2d2210; --bad:#ff6b8a; --bad-soft:#2d1219;
+  --raw:#59637a; --delta:#a48bff; --theta:#7b8cff; --alpha:#3ccf91; --beta:#f5a524; --trace:#c2c9d6; --shadow:none}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
+.mark{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center}.mark svg{width:15px}
+.tag{font-size:12px;font-weight:500;color:var(--text-2);border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:var(--bg)}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text-2)}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--muted)}.status.on i{background:var(--pos)}
+.spacer{flex:1}
+input,button,select{font:500 13px Inter,sans-serif;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+button{cursor:pointer;box-shadow:var(--shadow)}button:hover{background:var(--bg)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.eyes{font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:none}
+/* flow strip */
+.flow{display:flex;align-items:stretch;gap:0;padding:16px 24px 0;max-width:1680px;margin:0 auto;overflow-x:auto}
+.node{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;position:relative;transition:border-color .2s, box-shadow .2s}
+.node .k{font:500 11px "IBM Plex Mono";color:var(--muted)}
+.node .t{font-weight:600;font-size:13px}
+.node .m{font:500 12px "IBM Plex Mono";color:var(--text-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node.flash{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.arrow{flex:0 0 28px;display:grid;place-items:center;color:var(--muted)}
+.arrow svg{width:18px}
+/* grid */
+main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:16px 24px 24px;max-width:1680px;margin:0 auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-width:0}
+.card-h{padding:12px 16px 0}
+.step{display:flex;align-items:center;gap:8px}
+.num{width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font:600 12px Inter;display:grid;place-items:center}
+.card-h h2{font-size:14px;font-weight:600}
+.what{font-size:12.5px;color:var(--text-2);margin:6px 0 8px;min-height:38px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.chip{font:500 11px "IBM Plex Mono";padding:2px 7px;border-radius:5px;background:var(--bg);border:1px solid var(--line-2);color:var(--text-2)}
+.card-b{padding:6px 16px 8px;flex:1}
+canvas{display:block;width:100%}
+.card-f{display:flex;gap:16px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line-2);font-size:12px;color:var(--text-2)}
+.card-f b{font:500 12px "IBM Plex Mono";color:var(--text)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--text-2);margin-top:4px}
+.legend span::before{content:"";display:inline-block;width:10px;height:3px;border-radius:2px;background:var(--c);margin-right:5px;vertical-align:middle}
+.qrow{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-top:6px}
+.q{font:500 10.5px "IBM Plex Mono";text-align:center;padding:3px 0;border-radius:4px}
+.q.good{background:var(--pos-soft);color:var(--pos)}.q.artefact{background:var(--warn-soft);color:var(--warn)}.q.noisy,.q.flat{background:var(--bad-soft);color:var(--bad)}
+pre{font:11px/1.45 "IBM Plex Mono";background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;height:120px;overflow:hidden;color:var(--text-2);margin-top:8px;white-space:pre-wrap;word-break:break-all}
+footer{max-width:1680px;margin:0 auto;padding:0 24px 20px;font-size:12px;color:var(--muted)}
+@media(max-width:1200px){main{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){main{grid-template-columns:1fr;padding:12px 16px}.flow{padding:12px 16px 0}header{padding:10px 16px}.node{min-width:104px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="mark"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1 9h3l2-5 3 9 2-6 1.5 2H15"/></svg></div>MindCart · Real-time EEG pipeline</div>
+  <span class="status" id="status"><i></i><span id="statusText">Not connected</span></span>
+  <span class="eyes" id="eyes">Simulated: eyes closed</span>
+  <span class="spacer"></span>
+  <label class="tag">Focus channel <select id="chSel" aria-label="Focus channel"></select></label>
+  <input id="url" value="ws://localhost:8766" size="19" aria-label="Raw EEG WebSocket URL">
+  <button id="connectBtn">Connect headset</button>
+  <button id="demoBtn" class="primary">Run demo</button>
+  <button id="pauseBtn">Pause</button>
+</header>
+
+<div class="flow" id="flow"></div>
+
+<main>
+  <section class="card"><div class="card-h"><div class="step"><span class="num">1</span><h2>Acquisition</h2></div>
+    <p class="what">8 electrodes sampled at 250 Hz (24-bit). Raw values carry a large DC offset, slow drift and 50 Hz mains hum, so the brain signal is buried.</p>
+    <div class="chips"><span class="chip">8 ch</span><span class="chip">250 Hz</span><span class="chip">µV</span><span class="chip" id="srcChip">source: –</span></div></div>
+    <div class="card-b"><canvas id="c1" height="190"></canvas></div>
+    <div class="card-f"><span>Rate <b id="m1rate">–</b></span><span>Samples <b id="m1n">0</b></span><span>DC offset <b id="m1dc">–</b></span></div></section>
+
+  <section class="card"><div class="card-h"><div class="step"><span class="num">2</span><h2>Pre-processing</h2></div>
+    <p class="what">Remove the DC offset, band-pass 1–40 Hz to drop drift and muscle noise, and notch out 50 Hz mains. The filters are causal, so they work sample-by-sample in real time with no look-ahead.</p>
+    <div class="chips"><span class="chip">DC removal</span><span class="chip">HP 1 Hz (4th)</span><span class="chip">LP 40 Hz (4th)</span><span class="chip">Notch 50 Hz</span></div></div>
+    <div class="card-b"><canvas id="c2" height="190"></canvas>
+      <div class="legend"><span style="--c:var(--raw)">before (offset &amp; linear drift removed for display)</span><span style="--c:var(--accent)">after filtering</span></div></div>
+    <div class="card-f"><span>50 Hz reduced by <b id="m2notch">–</b></span><span>Amplitude <b id="m2amp">–</b></span></div></section>
+
+  <section class="card"><div class="card-h"><div class="step"><span class="num">3</span><h2>Quality & artefacts</h2></div>
+    <p class="what">Each 2 s window, every channel is checked: too flat (disconnected), too noisy (bad contact) or a large spike (blink or movement). Flagged windows are excluded from analysis.</p>
+    <div class="chips"><span class="chip">flat &lt; 0.5 µV</span><span class="chip">noisy σ &gt; 100 µV</span><span class="chip">artefact p-p &gt; 150 µV</span></div></div>
+    <div class="card-b"><canvas id="c3" height="190"></canvas><div class="qrow" id="qrow"></div></div>
+    <div class="card-f"><span>Good channels <b id="m3good">–</b></span><span>Artefacts flagged <b id="m3art">0</b></span><span>Clean windows <b id="m3clean">–</b></span></div></section>
+
+  <section class="card"><div class="card-h"><div class="step"><span class="num">4</span><h2>Spectral analysis</h2></div>
+    <p class="what">Welch power spectrum of the last 2 s (FFT on overlapping Hann windows). It shows how much of each frequency is present. Note the mains peak at 50 Hz before filtering.</p>
+    <div class="chips"><span class="chip">window 2.05 s</span><span class="chip">FFT 256 · 50% overlap</span><span class="chip">Δf ≈ 1 Hz</span></div></div>
+    <div class="card-b"><canvas id="c4" height="190"></canvas>
+      <div class="legend"><span style="--c:var(--raw)">raw</span><span style="--c:var(--accent)">filtered</span></div></div>
+    <div class="card-f"><span>Peak <b id="m4peak">–</b></span><span>Updates <b>1 / s</b></span></div></section>
+
+  <section class="card"><div class="card-h"><div class="step"><span class="num">5</span><h2>Band power features</h2></div>
+    <p class="what">The spectrum is summed into four frequency bands for each channel, as relative power (share of 1–30 Hz). Each row is an electrode and each column a band.</p>
+    <div class="chips"><span class="chip">δ 1–4</span><span class="chip">θ 4–8</span><span class="chip">α 8–13</span><span class="chip">β 13–30 Hz</span></div></div>
+    <div class="card-b"><canvas id="c5" height="210"></canvas></div>
+    <div class="card-f"><span>Posterior α <b id="m5pa">–</b></span><span>Fz θ <b id="m5th">–</b></span></div></section>
+
+  <section class="card"><div class="card-h"><div class="step"><span class="num">6</span><h2>Output to the app</h2></div>
+    <p class="what">Every second a feature vector is produced and streamed to MindCart. Below: the last 60 s of the key features, and the exact JSON frame sent.</p>
+    <div class="chips"><span class="chip">1 frame / s</span><span class="chip">JSON over WebSocket</span><span class="chip" id="latChip">compute –</span></div></div>
+    <div class="card-b"><canvas id="c6" height="110"></canvas>
+      <div class="legend"><span style="--c:var(--alpha)">posterior α (rel)</span><span style="--c:var(--theta)">Fz θ (rel)</span><span style="--c:var(--beta)">β/α ÷ 4</span></div>
+      <pre id="json">{}</pre></div>
+    <div class="card-f"><span>Frames <b id="m6n">0</b></span><span>Sample → feature latency <b id="m6lat">–</b></span></div></section>
+</main>
+<footer>Processing runs in this page on the raw stream, with the same parameters as eeg_pipeline (Python). Exploratory research prototype; band power is not a direct measure of preference or intent.</footer>
+
+<script>
+// ===================== constants =====================
+const FS=250, CH=["Fz","C3","Cz","C4","Pz","PO7","Oz","PO8"], NCH=8, BUF=FS*10, WIN=512;
+const BANDS={delta:[1,4],theta:[4,8],alpha:[8,13],beta:[13,30]};
+const POST=[4,5,6,7];
+const $=id=>document.getElementById(id), css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+CH.forEach((c,i)=>$('chSel').add(new Option(c,i))); $('chSel').value=6; // Oz
+let focus=6; $('chSel').onchange=e=>focus=+e.target.value;
+
+// flow strip
+const FLOW=[["1","Acquire","m_a"],["2","Filter","m_f"],["3","Quality","m_q"],["4","Spectrum","m_s"],["5","Band power","m_b"],["6","Output","m_o"]];
+$('flow').innerHTML=FLOW.map((f,i)=>`<div class="node" id="n${i}"><div class="k">STEP ${f[0]}</div><div class="t">${f[1]}</div><div class="m" id="${f[2]}">–</div></div>`+(i<5?'<div class="arrow"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10h13M11 5l5 5-5 5"/></svg></div>':'')).join('');
+function flashFlow(){FLOW.forEach((_,i)=>setTimeout(()=>{const n=$('n'+i);n.classList.add('flash');setTimeout(()=>n.classList.remove('flash'),260)},i*90))}
+
+// ===================== ring buffers =====================
+class Ring{constructor(n){this.a=CH.map(()=>new Float32Array(n));this.n=n;this.i=0;this.count=0}
+  push(v){for(let c=0;c<NCH;c++)this.a[c][this.i]=v[c];this.i=(this.i+1)%this.n;this.count++}
+  last(c,k){const o=new Float32Array(k);for(let j=0;j<k;j++)o[j]=this.a[c][(this.i-k+j+this.n*2)%this.n];return o}}
+let RAW,DCR,FILT,flags;
+function resetBuffers(){RAW=new Ring(BUF);DCR=new Ring(BUF);FILT=new Ring(BUF);flags=new Uint8Array(BUF);filt=CH.map(()=>makeChain());dc=null;
+  frames=[];hist=[];nArt=0;nWin=0;nClean=0;lastQ=CH.map(()=>'good');sinceFeat=0;rateWin=[];psdRaw=null;psdF=null;bp=null}
+
+// ===================== filters (RBJ biquads, DF2T) =====================
+function biquad(type,f0,Q){const w=2*Math.PI*f0/FS,c=Math.cos(w),s=Math.sin(w),al=s/(2*Q);let b0,b1,b2;const a0=1+al,a1=-2*c,a2=1-al;
+  if(type==='hp'){b0=(1+c)/2;b1=-(1+c);b2=(1+c)/2}else if(type==='lp'){b0=(1-c)/2;b1=1-c;b2=(1-c)/2}else{b0=1;b1=-2*c;b2=1}
+  return{b0:b0/a0,b1:b1/a0,b2:b2/a0,a1:a1/a0,a2:a2/a0,z1:0,z2:0}}
+function makeChain(){return[biquad('hp',1,.5412),biquad('hp',1,1.3066),biquad('lp',40,.5412),biquad('lp',40,1.3066),biquad('notch',50,30)]}
+function runChain(ch,x){for(const f of ch){const y=f.b0*x+f.z1;f.z1=f.b1*x-f.a1*y+f.z2;f.z2=f.b2*x-f.a2*y;x=y}return x}
+let filt,dc;
+
+// ===================== FFT + Welch =====================
+function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}
+  for(let len=2;len<=n;len<<=1){const a=-2*Math.PI/len,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){
+    const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;
+    const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
+const SEG=256,HANN=Float32Array.from({length:SEG},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/(SEG-1))),U=HANN.reduce((s,v)=>s+v*v,0);
+function welch(x){const p=new Float64Array(SEG/2+1);let k=0;for(let s=0;s+SEG<=x.length;s+=SEG/2,k++){
+  let m=0;for(let i=0;i<SEG;i++)m+=x[s+i];m/=SEG;const re=new Float64Array(SEG),im=new Float64Array(SEG);for(let i=0;i<SEG;i++)re[i]=(x[s+i]-m)*HANN[i];fft(re,im);
+  for(let f=0;f<=SEG/2;f++)p[f]+=(re[f]*re[f]+im[f]*im[f])/(FS*U)*(f&&f<SEG/2?2:1)}for(let f=0;f<p.length;f++)p[f]/=k;return p}
+const DF=FS/SEG, FREQ=Array.from({length:SEG/2+1},(_,i)=>i*DF);
+const bandSum=(p,lo,hi)=>{let s=0;for(let i=0;i<p.length;i++)if(FREQ[i]>=lo&&FREQ[i]<hi)s+=p[i]*DF;return s};
+
+// ===================== per-sample pipeline =====================
+let frames,hist,nArt,nWin,nClean,lastQ,sinceFeat,rateWin,psdRaw,psdF,bp,lastSampleWall=0,paused=false;
+function ingest(v,wall){ // v: raw µV for 8 channels
+  if(!dc)dc=v.slice();
+  RAW.push(v);const d=v.map((x,c)=>x-dc[c]);DCR.push(d);FILT.push(d.map((x,c)=>runChain(filt[c],x)));
+  lastSampleWall=wall;rateWin.push(wall);
+  if(++sinceFeat>=FS&&FILT.count>=2*WIN){sinceFeat=0;computeFeatures()}
+}
+function computeFeatures(){const t0=performance.now();
+  const win=CH.map((_,c)=>FILT.last(c,WIN));
+  // step 3 quality
+  const q=win.map(w=>{let m=0;for(const x of w)m+=x;m/=w.length;let s=0,mn=1e9,mx=-1e9;for(const x of w){s+=(x-m)**2;mn=Math.min(mn,x);mx=Math.max(mx,x)}const sd=Math.sqrt(s/w.length),pp=mx-mn;
+    return sd<.5?'flat':sd>100?'noisy':pp>150?'artefact':'good'});
+  q.forEach((s,c)=>{if(s==='artefact'&&lastQ[c]!=='artefact')nArt++});lastQ=q;nWin++;if(q.every(s=>s==='good'))nClean++;
+  // step 4/5 spectra
+  const P=win.map(w=>welch(w));psdF=P[focus];psdRaw=welch(DCR.last(focus,WIN));
+  bp=P.map(p=>{const tot=bandSum(p,1,30)||1e-12;const o={};for(const[b,[lo,hi]]of Object.entries(BANDS)){o[b]=bandSum(p,lo,hi);o[b+'_rel']=o[b]/tot}return o});
+  const good=q.map(s=>s==='good'),sel=POST.filter(i=>good[i]);const use=sel.length?sel:POST;
+  const pa=use.reduce((s,i)=>s+bp[i].alpha_rel,0)/use.length, th=bp[0].theta_rel;
+  const gi=CH.map((_,i)=>i).filter(i=>good[i]),ba=(gi.length?gi:CH.map((_,i)=>i)).reduce((s,i)=>s+bp[i].beta/Math.max(bp[i].alpha,1e-12),0)/(gi.length||NCH);
+  const frame={t:+(FILT.count/FS).toFixed(2),channels:CH,quality:q,
+    alpha_rel:bp.map(b=>+b.alpha_rel.toFixed(3)),theta_rel:bp.map(b=>+b.theta_rel.toFixed(3)),beta_rel:bp.map(b=>+b.beta_rel.toFixed(3)),
+    summary:{n_good:good.filter(Boolean).length,posterior_alpha_rel:+pa.toFixed(3),fz_theta_rel:+th.toFixed(3),beta_alpha_ratio:+ba.toFixed(3)}};
+  const comp=performance.now()-t0;frames.push(frame);hist.push({t:frame.t,pa,th,ba});while(hist.length>60)hist.shift();
+  // UI text
+  $('json').textContent=JSON.stringify(frame,null,1).replace(/\n\s+(-?[\d.]+|"\w+")(,?)(?=\n)/g,' $1$2');
+  $('m6n').textContent=frames.length;$('latChip').textContent=`compute ${comp.toFixed(1)} ms`;
+  $('m6lat').textContent=`${(2048/2+comp).toFixed(0)} ms`; // window centre delay + compute
+  const ng=frame.summary.n_good;$('m3good').textContent=`${ng} / 8`;$('m3good').style.color=ng>=6?css('--pos'):css('--warn');$('m3art').textContent=nArt;$('m3clean').textContent=Math.round(100*nClean/nWin)+'%';
+  $('qrow').innerHTML=q.map((s,i)=>`<div class="q ${s}" title="${s}">${CH[i]}</div>`).join('');
+  $('m5pa').textContent=(pa*100).toFixed(0)+'%';$('m5th').textContent=(th*100).toFixed(0)+'%';
+  let pk=0,pv=0;for(let i=0;i<psdF.length;i++)if(FREQ[i]>=2&&FREQ[i]<=40&&psdF[i]>pv){pv=psdF[i];pk=FREQ[i]}$('m4peak').textContent=pk.toFixed(1)+' Hz';
+  const n50r=bandSum(psdRaw,48,52),n50f=bandSum(psdF,48,52);const red=10*Math.log10((n50r+1e-9)/(n50f+1e-9));$('m2notch').textContent=red.toFixed(0)+' dB';
+  $('m_q').textContent=`${ng}/8 good`;$('m_s').textContent=`peak ${pk.toFixed(1)} Hz`;$('m_b').textContent=`post α ${(pa*100).toFixed(0)}%`;$('m_o').textContent=`frame #${frames.length}`;$('m_f').textContent=`−${red.toFixed(0)} dB @50 Hz`;
+  flashFlow();
+}
+
+// ===================== drawing =====================
+function fit(c){if(!c.dataset.h)c.dataset.h=c.getAttribute('height');const r=c.getBoundingClientRect(),d=devicePixelRatio||1,w=r.width||300,h=+c.dataset.h;
+  if(c.width!==Math.round(w*d)||c.height!==Math.round(h*d)){c.width=w*d;c.height=h*d;c.style.height=h+'px'}const g=c.getContext('2d');g.setTransform(d,0,0,d,0,0);g.clearRect(0,0,w,h);return[g,w,h]}
+function axes(g,w,h,L,B,yl,xl){g.strokeStyle=css('--line');g.lineWidth=1;g.beginPath();g.moveTo(L,4);g.lineTo(L,h-B);g.lineTo(w,h-B);g.stroke();
+  g.fillStyle=css('--muted');g.font='10.5px Inter';if(yl){g.save();g.translate(10,(h-B)/2);g.rotate(-Math.PI/2);g.textAlign='center';g.fillText(yl,0,0);g.restore()}
+  if(xl){g.textAlign='right';g.fillText(xl,w-2,h-2);g.textAlign='left'}}
+function line(g,arr,x0,x1,y0,y1,lo,hi,col,lw=1.2){const n=arr.length;g.strokeStyle=col;g.lineWidth=lw;g.beginPath();
+  for(let i=0;i<n;i+=Math.max(1,Math.floor(n/(x1-x0)))){const x=x0+(x1-x0)*i/(n-1),y=y1-(Math.max(lo,Math.min(hi,arr[i]))-lo)/(hi-lo)*(y1-y0);i?g.lineTo(x,y):g.moveTo(x,y)}g.stroke()}
+function range(a){let mn=1e18,mx=-1e18;for(const v of a){if(v<mn)mn=v;if(v>mx)mx=v}if(mx-mn<1e-6){mx+=1;mn-=1}const p=(mx-mn)*.08;return[mn-p,mx+p]}
+const fmt=v=>Math.abs(v)>=1e4?(v/1000).toFixed(0)+'k':Math.abs(v)>=100?v.toFixed(0):v.toFixed(1);
+function yTicks(g,L,y0,y1,lo,hi){g.fillStyle=css('--muted');g.font='10px "IBM Plex Mono"';g.textAlign='right';[lo,(lo+hi)/2,hi].forEach(v=>{const y=y1-(v-lo)/(hi-lo)*(y1-y0);g.fillText(fmt(v),L-4,y+3)});g.textAlign='left'}
+
+const SHOW=FS*5;
+function draw(){if(!RAW||RAW.count<10){[1,2,3,4,5,6].forEach(i=>fit($('c'+i)));return}
+  const L=46,B=16;
+  // 1 raw
+  {const[g,w,h]=fit($('c1'));const a=RAW.last(focus,Math.min(SHOW,RAW.count));const[lo,hi]=range(a);axes(g,w,h,L,B,'µV (raw)','5 s');yTicks(g,L,6,h-B,lo,hi);line(g,a,L,w,6,h-B,lo,hi,css('--trace'),1);
+   g.fillStyle=css('--text-2');g.font='600 11px Inter';g.fillText(CH[focus],L+6,16);$('m1dc').textContent=fmt(dc?dc[focus]:0)+' µV'}
+  // 2 before/after
+  {const[g,w,h]=fit($('c2'));const n=Math.min(SHOW,DCR.count),a=DCR.last(focus,n),b=FILT.last(focus,n);let[lo,hi]=range(b);const md=(lo+hi)/2,hw=Math.max(30,(hi-lo)*1.6);lo=md-hw;hi=md+hw;const N=a.length;let sx=0,sy=0,sxx=0,sxy=0;for(let i=0;i<N;i++){sx+=i;sy+=a[i];sxx+=i*i;sxy+=i*a[i]}const sl=(N*sxy-sx*sy)/(N*sxx-sx*sx||1),ic=(sy-sl*sx)/N;const ac=a.map((v,i)=>v-(ic+sl*i));axes(g,w,h,L,B,'µV','5 s');yTicks(g,L,6,h-B,lo,hi);
+   line(g,ac,L,w,6,h-B,lo,hi,css('--raw'),1);line(g,b,L,w,6,h-B,lo,hi,css('--accent'),1.4);g.fillStyle=css('--muted');g.font='10px Inter';
+   let s=0;for(const v of b.subarray(-WIN))s+=v*v;$('m2amp').textContent='σ '+Math.sqrt(s/WIN).toFixed(1)+' µV'}
+  // 3 all channels filtered + artefact shading
+  {const[g,w,h]=fit($('c3'));const n=Math.min(SHOW,FILT.count),lane=(h-4)/NCH,L3=34;
+   CH.forEach((c,i)=>{const a=FILT.last(i,n),y0=lane*i+2,y1=y0+lane;const bad=lastQ[i]!=='good';
+    if(bad){g.fillStyle=lastQ[i]==='artefact'?css('--warn-soft'):css('--bad-soft');g.fillRect(L3,y0,w-L3,lane)}
+    g.fillStyle=css('--muted');g.font='500 10px "IBM Plex Mono"';g.fillText(c,0,y0+lane/2+3);
+    line(g,a,L3,w,y0,y1,-60,60,bad?(lastQ[i]==='artefact'?css('--warn'):css('--bad')):css('--trace'),1);
+    for(let k=0;k<n;k++)if(Math.abs(a[k])>75){g.fillStyle=css('--warn');g.fillRect(L3+(w-L3)*k/n,y1-2,2,2)}});
+   g.fillStyle=css('--muted');g.font='10px Inter';g.textAlign='right';g.fillText('±60 µV / lane · 5 s',w-2,h-2);g.textAlign='left'}
+  // 4 PSD
+  {const[g,w,h]=fit($('c4'));if(psdF){const fmax=60,X=f=>L+(w-L)*f/fmax;const lp=a=>Array.from(a,v=>Math.log10(v+1e-6));const r=lp(psdRaw),f=lp(psdF);
+    const lo=Math.min(...f.slice(1,45))-.5,hi=Math.max(...r.slice(1,60),...f.slice(1,40))+.3;
+    for(const[b,[a0,a1]]of Object.entries(BANDS)){g.fillStyle=css('--'+b)+'18';g.fillRect(X(a0),6,X(a1)-X(a0),h-B-6);g.fillStyle=css('--'+b);g.font='600 10px Inter';g.fillText({delta:'δ',theta:'θ',alpha:'α',beta:'β'}[b],(X(a0)+X(a1))/2-3,16)}
+    axes(g,w,h,L,B,'log₁₀ µV²/Hz','Hz');const k=Math.round(fmax/DF)+1;line(g,r.slice(0,k),L,X(FREQ[k-1]),6,h-B,lo,hi,css('--raw'),1.2);line(g,f.slice(0,k),L,X(FREQ[k-1]),6,h-B,lo,hi,css('--accent'),1.6);
+    g.fillStyle=css('--muted');g.font='10px "IBM Plex Mono"';[0,10,20,30,40,50].forEach(v=>g.fillText(v,X(v)-4,h-3));yTicks(g,L,6,h-B,lo,hi)}}
+  // 5 heatmap
+  {const[g,w,h]=fit($('c5'));if(bp){const bands=Object.keys(BANDS),L5=40,T=18,cw=(w-L5)/4,rh=(h-T)/NCH;
+    g.font='600 11px Inter';g.fillStyle=css('--text-2');bands.forEach((b,j)=>{g.textAlign='center';g.fillText({delta:'δ delta',theta:'θ theta',alpha:'α alpha',beta:'β beta'}[b],L5+cw*(j+.5),12)});
+    const pal=v=>{v=Math.max(0,Math.min(1,v/0.6));const s=[[247,248,252],[199,210,250],[124,141,240],[62,79,216],[30,36,120]];const x=v*4,i=Math.min(3,Math.floor(x)),f=x-i;return`rgb(${s[i].map((a,k)=>Math.round(a+(s[i+1][k]-a)*f))})`};
+    CH.forEach((c,i)=>{g.textAlign='left';g.fillStyle=css('--muted');g.font='500 10.5px "IBM Plex Mono"';g.fillText(c,0,T+rh*(i+.5)+3);
+     bands.forEach((b,j)=>{const v=bp[i][b+'_rel'];g.fillStyle=pal(v);g.fillRect(L5+cw*j+1,T+rh*i+1,cw-2,rh-2);g.fillStyle=v>.3?'#fff':'#101828';g.font='500 10.5px "IBM Plex Mono"';g.textAlign='center';g.fillText((v*100).toFixed(0)+'%',L5+cw*(j+.5),T+rh*(i+.5)+3)})});g.textAlign='left'}}
+  // 6 trend
+  {const[g,w,h]=fit($('c6'));if(hist.length>1){const t1=hist[hist.length-1].t,X=t=>28+(w-28)*(t-(t1-60))/60;axes(g,w,h,28,B,'','60 s');
+    g.fillStyle=css('--muted');g.font='10px "IBM Plex Mono"';g.textAlign='right';g.fillText('1',24,10);g.fillText('0',24,h-B);g.textAlign='left';
+    [['pa','--alpha',1],['th','--theta',1],['ba','--beta',.25]].forEach(([k,c,s])=>{g.strokeStyle=css(c);g.lineWidth=1.8;g.beginPath();hist.forEach((p,i)=>{const x=X(p.t),y=(h-B)-Math.min(1,p[k]*s)*(h-B-6);i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()})}}
+  // metrics
+  const now=performance.now();rateWin=rateWin.filter(t=>now-t<2000);$('m1rate').textContent=(rateWin.length/2).toFixed(0)+' Hz';$('m1n').textContent=RAW.count.toLocaleString();
+  $('m_a').textContent=`${(rateWin.length/2).toFixed(0)} Hz · ${RAW.count.toLocaleString()}`;
+}
+
+// ===================== sources =====================
+let mode=null,ws=null,demoT=null,demoK=0,demoStart=0;
+const rnd=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+let pinkS=CH.map(()=>[0,0,0]),ph=CH.map(()=>Math.random()*6.28),offs=CH.map(()=>(Math.random()-.5)*60000),blinkAt=3;
+function demoSample(k){const t=k/FS,closed=(t%30)>=15;
+  if(!closed&&t>blinkAt){blinkAt=t+4+Math.random()*4}
+  return CH.map((c,i)=>{const s=pinkS[i];const w=rnd();s[0]=.997*s[0]+.03*w;s[1]=.96*s[1]+.25*w;s[2]=.6*s[2]+.6*w;const bg=(s[0]*20+s[1]*6+s[2]*3);
+    const post=i>=4,alpha=(post?(closed?22:5):3)*Math.sin(2*Math.PI*(10+.3*Math.sin(t*.7))*t+ph[i]);
+    const theta=(i===0?4:2)*Math.sin(2*Math.PI*6*t+ph[i]),beta=2*Math.sin(2*Math.PI*20*t+i);
+    const mains=35*Math.sin(2*Math.PI*50*t+i*.2),drift=400*Math.sin(2*Math.PI*.05*t+i)+60*t;
+    const dt=t-(blinkAt-4.5),blink=(!closed&&(i<=2)&&Math.abs(dt)<.2)?(i===0?220:90)*Math.cos(dt/.2*Math.PI/2)**2:0;
+    const emg=(i===1&&(t%23)>20)?rnd()*35:0;
+    return offs[i]+drift+mains+bg+alpha+theta+beta+blink+emg})}
+function demo(){stop();resetBuffers();mode='demo';demoK=0;demoStart=performance.now();$('status').classList.add('on');$('statusText').textContent='Demo · simulated headset';$('srcChip').textContent='source: simulated';
+  demoT=setInterval(()=>{if(paused)return;const target=Math.floor((performance.now()-demoStart)/1000*FS);const w=performance.now();while(demoK<target){ingest(demoSample(demoK),w);demoK++}
+    const closed=(demoK/FS%30)>=15;$('eyes').style.display='inline-block';$('eyes').textContent=closed?'Simulated: eyes closed':'Simulated: eyes open, blinking'},40)}
+function connect(){stop();resetBuffers();mode='live';$('eyes').style.display='none';$('statusText').textContent='Connecting…';$('srcChip').textContent='source: headset';
+  ws=new WebSocket($('url').value.trim());
+  ws.onopen=()=>{$('status').classList.add('on');$('statusText').textContent='Live · '+$('url').value};
+  ws.onmessage=e=>{if(paused)return;const m=JSON.parse(e.data);if(m.type!=='raw')return;const w=performance.now();for(const v of m.x)ingest(v,w)};
+  ws.onerror=()=>$('statusText').textContent='Connection error: is stream_unicorn.py running?';
+  ws.onclose=()=>{$('status').classList.remove('on');if(mode==='live')$('statusText').textContent='Disconnected'}}
+function stop(){if(demoT)clearInterval(demoT);demoT=null;if(ws){ws.onclose=null;ws.close();ws=null};$('status').classList.remove('on')}
+$('demoBtn').onclick=demo;$('connectBtn').onclick=connect;$('pauseBtn').onclick=()=>{paused=!paused;$('pauseBtn').textContent=paused?'Resume':'Pause'};
+resetBuffers();(function loop(){if(!paused)draw();requestAnimationFrame(loop)})();
+const q=new URLSearchParams(location.search);if(q.get('theme'))document.documentElement.dataset.theme=q.get('theme');
+if(q.get('ws')){$('url').value=q.get('ws');connect()}else if(q.has('demo'))demo();
+</script>
+</body>
+</html>

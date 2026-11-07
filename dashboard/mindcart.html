@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MindCart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --line:#e4e7ec; --line-2:#eef0f3; --text:#101828; --text-2:#475467; --muted:#98a2b3;
+  --accent:#3e4fd8; --accent-soft:#eef0ff; --pos:#12805c; --pos-soft:#e8f6f0; --mid:#b54708; --mid-soft:#fff4e5; --neg:#667085; --neg-soft:#f2f4f7;
+  --theta:#3e4fd8; --alpha:#12805c; --beta:#b54708; --trace:#344054;
+  --radius:12px; --shadow:0 1px 2px rgba(16,24,40,.05);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c111d; --surface:#141a29; --line:#232a3b; --line-2:#1b2233; --text:#f2f4f7; --text-2:#b4bccb; --muted:#6b7588;
+  --accent:#7b8cff; --accent-soft:#1d2445; --pos:#3ccf91; --pos-soft:#11291f; --mid:#f5a524; --mid-soft:#2d2210; --neg:#98a2b3; --neg-soft:#1b2233;
+  --theta:#7b8cff; --alpha:#3ccf91; --beta:#f5a524; --trace:#c2c9d6; --shadow:none}}
+:root[data-theme="dark"]{--bg:#0c111d; --surface:#141a29; --line:#232a3b; --line-2:#1b2233; --text:#f2f4f7; --text-2:#b4bccb; --muted:#6b7588;
+  --accent:#7b8cff; --accent-soft:#1d2445; --pos:#3ccf91; --pos-soft:#11291f; --mid:#f5a524; --mid-soft:#2d2210; --neg:#98a2b3; --neg-soft:#1b2233;
+  --theta:#7b8cff; --alpha:#3ccf91; --beta:#f5a524; --trace:#c2c9d6; --shadow:none}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:-.01em}
+.mark{width:28px;height:28px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.mark svg{width:16px;height:16px}
+.tag{font-size:12px;font-weight:500;color:var(--text-2);border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:var(--bg)}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text-2)}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.status.on i{background:var(--pos)}
+.spacer{flex:1}
+input,button{font:500 13px Inter,sans-serif;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 12px}
+button{cursor:pointer;box-shadow:var(--shadow)} button:hover{background:var(--bg)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff} button.primary:hover{filter:brightness(1.08)}
+main{display:grid;grid-template-columns:minmax(280px,1fr) minmax(380px,1.3fr) minmax(280px,1fr);gap:20px;padding:24px 28px;max-width:1600px;margin:0 auto}
+.col{display:flex;flex-direction:column;gap:20px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);min-width:0}
+.card-h{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line-2)}
+.card-h h2{font-size:13px;font-weight:600}
+.card-h span{font-size:12px;color:var(--muted)}
+.card-b{padding:16px 18px}
+canvas{display:block;width:100%}
+/* stage */
+.stage .card-b{display:flex;flex-direction:column;align-items:center;gap:18px;padding:24px}
+.steps{display:flex;gap:6px;width:100%;max-width:420px}
+.steps div{flex:1;font-size:11px;font-weight:500;color:var(--muted);text-align:center;padding-top:8px;border-top:3px solid var(--line);transition:.3s}
+.steps div.on{color:var(--accent);border-color:var(--accent)}
+.steps div.done{color:var(--text-2);border-color:var(--text-2)}
+.product{width:min(100%,360px);aspect-ratio:1;border-radius:10px;background:var(--bg);border:1px solid var(--line-2);position:relative;display:grid;place-items:center;overflow:hidden}
+#pimg{position:absolute;inset:0;display:grid;place-items:center;transition:opacity .35s}
+#pimg svg{width:58%;height:auto}
+.fix{position:absolute;font:300 48px Inter;color:var(--muted);opacity:0;transition:.2s}.fix.on{opacity:1}
+.pinfo{text-align:center}
+.pname{font-size:20px;font-weight:600;letter-spacing:-.01em}
+.pmeta{color:var(--text-2);font-size:13px}
+.score{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center;width:100%;max-width:420px}
+.score .num{font-size:40px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1;grid-row:span 2}
+.score .lbl{font-size:12px;color:var(--text-2);font-weight:500}
+.track{height:8px;background:var(--line-2);border-radius:4px;position:relative;overflow:hidden}
+.track b{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:4px;transition:width .5s ease}
+.track i{position:absolute;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
+.badge{font-size:12px;font-weight:600;padding:5px 10px;border-radius:6px;min-height:28px}
+.badge:empty{visibility:hidden}
+.badge.pos{background:var(--pos-soft);color:var(--pos)} .badge.mid{background:var(--mid-soft);color:var(--mid)} .badge.neg{background:var(--neg-soft);color:var(--neg)}
+/* bands */
+.band{display:grid;grid-template-columns:118px 1fr 52px;gap:10px;align-items:center;padding:7px 0}
+.band .n{font-size:13px;font-weight:500}.band .n small{display:block;color:var(--muted);font-size:11px;font-weight:400}
+.band .v{font:500 13px "IBM Plex Mono";text-align:right;font-variant-numeric:tabular-nums}
+.dbar{height:8px;background:var(--line-2);border-radius:4px;position:relative}
+.dbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
+.dbar b{position:absolute;top:0;bottom:0;border-radius:4px;transition:all .5s ease}
+/* stats */
+.kv{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line-2);font-size:13px;color:var(--text-2)}
+.kv:last-child{border-bottom:0}.kv b{font:500 13px "IBM Plex Mono";color:var(--text)}
+.note{font-size:11px;color:var(--muted);margin-top:8px}
+/* shortlist */
+.list{display:flex;flex-direction:column}
+.li{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-2);animation:fade .4s ease}
+.li:last-child{border-bottom:0}
+.li .th{width:40px;height:40px;border-radius:8px;background:var(--bg);display:grid;place-items:center}.li .th svg{width:70%}
+.li .t{font-size:13px;font-weight:500}.li .s{font-size:12px;color:var(--muted)}
+.li .sc{font:500 13px "IBM Plex Mono"}
+.empty{color:var(--muted);font-size:13px;padding:6px 0}
+.reflect{display:none;margin-top:12px;padding:12px;border-radius:8px;background:var(--accent-soft);font-size:13px;color:var(--text)}
+.reflect b{font-weight:600}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}}
+footer{max-width:1600px;margin:0 auto;padding:0 28px 24px;font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
+@media(max-width:1100px){main{grid-template-columns:1fr;padding:16px}header{padding:12px 16px}footer{padding:0 16px 20px}.stage{order:-1}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="mark"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1 9h3l2-5 3 9 2-6 1.5 2H15"/></svg></div>MindCart</div>
+  <span class="tag">Research prototype</span>
+  <span class="status" id="status"><i></i><span id="statusText">Not connected</span></span>
+  <span class="spacer"></span>
+  <span class="tag mono">g.tec Unicorn · 8 ch · 250 Hz</span>
+  <input id="url" value="ws://localhost:8765" size="20" aria-label="WebSocket URL">
+  <button id="connectBtn">Connect headset</button>
+  <button id="demoBtn" class="primary">Run demo</button>
+</header>
+
+<main>
+  <div class="col">
+    <section class="card"><div class="card-h"><h2>EEG signal</h2><span class="mono" id="clock">00:00</span></div><div class="card-b"><canvas id="eeg" height="280"></canvas></div></section>
+    <section class="card"><div class="card-h"><h2>Alpha topography</h2><span>Relative 8–13 Hz power</span></div><div class="card-b"><canvas id="topo" height="230"></canvas></div></section>
+  </div>
+
+  <section class="card stage"><div class="card-h"><h2>Product evaluation</h2><span id="trialN">Trial 0 of 0</span></div>
+    <div class="card-b">
+      <div class="steps"><div id="st0">Fixation</div><div id="st1">Viewing</div><div id="st2">Decoded</div></div>
+      <div class="product"><div class="fix" id="fix">+</div><div id="pimg"></div></div>
+      <div class="pinfo"><div class="pname" id="pname">No item</div><div class="pmeta" id="pmeta">Run the demo or connect a headset</div></div>
+      <div class="score"><div class="num" id="score">–</div><div class="lbl">EEG interest index</div><div class="track"><b id="scoreBar" style="width:0"></b><i style="left:42%"></i><i style="left:66%"></i></div></div>
+      <div class="badge" id="badge"></div>
+    </div>
+  </section>
+
+  <div class="col">
+    <section class="card"><div class="card-h"><h2>Band power</h2><span>Change vs fixation</span></div><div class="card-b">
+      <div class="band"><div class="n">Theta<small>4–8 Hz · Fz</small></div><div class="dbar"><b id="bTheta"></b></div><div class="v" id="vTheta">–</div></div>
+      <div class="band"><div class="n">Alpha<small>8–13 Hz · posterior</small></div><div class="dbar"><b id="bAlpha"></b></div><div class="v" id="vAlpha">–</div></div>
+      <div class="band"><div class="n">Beta<small>13–30 Hz · all</small></div><div class="dbar"><b id="bBeta"></b></div><div class="v" id="vBeta">–</div></div>
+    </div></section>
+    <section class="card"><div class="card-h"><h2>Session</h2><span id="modeLbl">—</span></div><div class="card-b">
+      <div class="kv"><span>Channels within quality threshold</span><b id="sq">–</b></div>
+      <div class="kv"><span>Mean interest index</span><b id="avg">–</b></div>
+      <div class="kv"><span>Model C balanced accuracy</span><b id="acc">–</b></div>
+      <div class="kv"><span>EEG gain over product data (C − A)</span><b id="gain">–</b></div>
+      <div class="note" id="simNote" style="display:none">Model figures from simulated sessions; replace with results.csv after data collection.</div>
+    </div></section>
+    <section class="card"><div class="card-h"><h2>Shortlist</h2><span id="cartN">0 items</span></div><div class="card-b">
+      <div class="list" id="cart"><div class="empty">Items above the interest threshold appear here.</div></div>
+      <div class="reflect" id="reflect"></div>
+    </div></section>
+  </div>
+</main>
+<footer><span>MindCart · Oxford Neurotech Hackathon 2026</span><span>Exploratory research tool. The interest index reflects EEG band-power changes and does not measure purchase intention.</span></footer>
+
+<script>
+const SVG={
+ hoodie:c=>`<svg viewBox="0 0 100 100"><path d="M30 20q20-14 40 0l18 14-8 16-8-5v45H28V45l-8 5-8-16z" fill="${c}"/><path d="M38 18q12 16 24 0" fill="none" stroke="#0004" stroke-width="2.5"/><rect x="38" y="60" width="24" height="12" rx="3" fill="#0002"/></svg>`,
+ tee:c=>`<svg viewBox="0 0 100 100"><path d="M34 18q16 10 32 0l22 14-8 14-10-5v49H30V41l-10 5-8-14z" fill="${c}"/><path d="M40 18q10 8 20 0" fill="none" stroke="#0004" stroke-width="2.5"/></svg>`,
+ jacket:c=>`<svg viewBox="0 0 100 100"><path d="M32 16l18 8 18-8 22 18-6 58H70V40l-20 50-20-50v52H16l-6-58z" fill="${c}"/><path d="M50 24v66" stroke="#0005" stroke-width="1.5"/><circle cx="46" cy="44" r="1.8" fill="#fff8"/><circle cx="46" cy="58" r="1.8" fill="#fff8"/></svg>`,
+ dress:c=>`<svg viewBox="0 0 100 100"><path d="M40 12h20l-2 16 6 16 18 46H18l18-46 6-16z" fill="${c}"/><path d="M36 44h28" stroke="#0004" stroke-width="2.5"/></svg>`,
+ jeans:c=>`<svg viewBox="0 0 100 100"><path d="M28 10h44l6 84H58L50 40l-8 54H22z" fill="${c}"/><path d="M28 18h44" stroke="#0005" stroke-width="2.5"/><path d="M50 18v20" stroke="#0004" stroke-width="1.5"/></svg>`,
+ sneaker:c=>`<svg viewBox="0 0 100 100"><path d="M10 62q4-22 18-26l14 10 16-6q20 4 32 22v10H10z" fill="${c}"/><rect x="10" y="70" width="80" height="10" rx="4" fill="#f4f1ea" stroke="#0002"/><path d="M34 46l6 8M42 44l6 8" stroke="#0005" stroke-width="2.5"/></svg>`};
+const PRODUCTS=[
+ {n:"Heavyweight Hoodie",t:"hoodie",c:"#3d4a5c",p:65,cat:"Knitwear"},{n:"Quilted Jacket",t:"jacket",c:"#6b705c",p:140,cat:"Outerwear"},
+ {n:"Satin Slip Dress",t:"dress",c:"#7d5a6b",p:85,cat:"Dresses"},{n:"Organic Cotton Tee",t:"tee",c:"#d9d4c7",p:25,cat:"Basics"},
+ {n:"Wide-Leg Jeans",t:"jeans",c:"#41618a",p:70,cat:"Denim"},{n:"Leather Runner",t:"sneaker",c:"#a0522d",p:110,cat:"Footwear"},
+ {n:"Boxy Tee",t:"tee",c:"#1f2933",p:30,cat:"Basics"},{n:"Wool Overshirt",t:"jacket",c:"#8b6f4e",p:120,cat:"Outerwear"},
+ {n:"Merino Hoodie",t:"hoodie",c:"#8a9a8b",p:75,cat:"Knitwear"},{n:"Midi Dress",t:"dress",c:"#b08a5a",p:95,cat:"Dresses"}];
+const CH=["Fz","C3","Cz","C4","Pz","PO7","Oz","PO8"];
+const POS={Fz:[0,-.5],C3:[-.55,0],Cz:[0,0],C4:[.55,0],Pz:[0,.42],PO7:[-.5,.66],Oz:[0,.84],PO8:[.5,.66]};
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const HI=.66, MID=.42;
+function fit(c){if(!c.dataset.h)c.dataset.h=c.getAttribute('height');const r=c.getBoundingClientRect(),d=devicePixelRatio||1,w=r.width||c.width,h=+c.dataset.h;
+ if(c.width!==Math.round(w*d)){c.width=w*d;c.height=h*d;c.style.height=h+'px'}const g=c.getContext('2d');g.setTransform(d,0,0,d,0,0);return[g,w,h]}
+const S={mode:null,ws:null,t0:performance.now(),buf:CH.map(()=>new Float32Array(1000)),wi:0,alphaCh:CH.map(()=>.35),bands:{theta:0,alpha:0,beta:0},
+ trial:0,total:PRODUCTS.length,scores:[],cart:[],phase:"idle",quality:CH.map(()=>"good"),like:0};
+
+// synthetic EEG
+let ph=CH.map(()=>Math.random()*6.28),pk=CH.map(()=>0);
+function synth(t){const v=S.phase==="view",lk=S.like;return CH.map((c,i)=>{const post=/^(P|O)/.test(c);pk[i]=.97*pk[i]+(Math.random()-.5)*6;
+ const a=post?(v?9-6*lk:12):4,th=c==="Fz"?(v?3+7*lk:3):2;let x=pk[i]+a*Math.sin(2*Math.PI*10*t+ph[i])+th*Math.sin(2*Math.PI*6*t+ph[i]*1.3)+2*Math.sin(2*Math.PI*21*t+i);
+ if(c==="Fz"&&S.blinkAt&&Math.abs(t-S.blinkAt)<.15)x+=90*Math.cos((t-S.blinkAt)/.15*Math.PI/2);return x})}
+
+function drawEEG(){const[g,w,h]=fit($('eeg'));g.clearRect(0,0,w,h);const n=1000,lane=h/CH.length,L=34;
+ g.strokeStyle=css('--line-2');g.lineWidth=1;for(let k=1;k<5;k++){const x=L+(w-L)*k/5;g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke()}
+ CH.forEach((c,i)=>{const y0=lane*(i+.5),a=S.buf[i];g.font='500 11px "IBM Plex Mono",monospace';g.fillStyle=css('--muted');g.textBaseline='middle';g.fillText(c,0,y0);
+  const bad=S.quality[i]!=="good";g.strokeStyle=bad?css('--mid'):css('--trace');g.lineWidth=1;g.beginPath();
+  for(let k=0;k<n;k+=2){const v=a[(S.wi+k)%n],x=L+(w-L)*k/n,y=y0-Math.max(-1,Math.min(1,v/45))*lane*.42;k?g.lineTo(x,y):g.moveTo(x,y)}g.stroke()});
+ g.fillStyle=css('--muted');g.font='11px Inter';g.textBaseline='alphabetic';g.fillText('4 s',w-20,h-2)}
+
+// viridis-like sequential palette
+function pal(v){v=Math.max(0,Math.min(1,v));const s=[[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]];const x=v*(s.length-1),i=Math.min(s.length-2,Math.floor(x)),f=x-i;return s[i].map((a,k)=>Math.round(a+(s[i+1][k]-a)*f))}
+const off=document.createElement('canvas');off.width=off.height=64;
+function drawTopo(){const[g,w,h]=fit($('topo'));g.clearRect(0,0,w,h);const R=Math.min(w*.6,h)*.42,cx=w*.42,cy=h/2+6,o=off.getContext('2d'),im=o.createImageData(64,64);
+ for(let y=0;y<64;y++)for(let x=0;x<64;x++){const u=x/31.5-1,v=y/31.5-1,k=(y*64+x)*4;if(u*u+v*v>1){im.data[k+3]=0;continue}
+  let nu=0,de=0;CH.forEach((c,i)=>{const d=(u-POS[c][0])**2+(v-POS[c][1])**2+1e-3,wt=1/(d*d);nu+=wt*S.alphaCh[i];de+=wt});
+  const[r,gg,b]=pal(nu/de);im.data[k]=r;im.data[k+1]=gg;im.data[k+2]=b;im.data[k+3]=255}
+ o.putImageData(im,0,0);g.drawImage(off,cx-R,cy-R,2*R,2*R);
+ g.strokeStyle=css('--text-2');g.lineWidth=1.5;g.beginPath();g.arc(cx,cy,R,0,7);g.stroke();g.beginPath();g.moveTo(cx-9,cy-R+1);g.lineTo(cx,cy-R-11);g.lineTo(cx+9,cy-R+1);g.stroke();
+ CH.forEach((c,i)=>{const x=cx+POS[c][0]*R,y=cy+POS[c][1]*R;g.fillStyle='#fff';g.strokeStyle='#0008';g.lineWidth=1;g.beginPath();g.arc(x,y,3,0,7);g.fill();g.stroke();
+  g.font='500 10px "IBM Plex Mono"';g.fillStyle='#fff';g.fillText(c,x+5,y-4)});
+ // colour bar
+ const bx=w*.82,by=cy-R,bh=2*R;for(let k=0;k<bh;k++){const[r,gg,b]=pal(1-k/bh);g.fillStyle=`rgb(${r},${gg},${b})`;g.fillRect(bx,by+k,10,1)}
+ g.fillStyle=css('--muted');g.font='11px Inter';g.fillText('high',bx+15,by+8);g.fillText('low',bx+15,by+bh)}
+
+// UI
+let sa=0,st=null;
+function tickScore(){if(st==null)return;sa+=(st-sa)*.1;$('score').textContent=Math.round(sa*100);$('scoreBar').style.width=Math.round(sa*100)+'%'}
+function dbar(id,vid,v,col){const f=Math.max(-1,Math.min(1,v)),b=$(id);b.style.background=col;b.style.left=f<0?(50+f*50)+'%':'50%';b.style.width=Math.abs(f)*50+'%';
+ $(vid).textContent=(v>=0?'+':'−')+Math.abs(Math.round(v*100))+'%'}
+function updateBands(){const b=S.bands;dbar('bTheta','vTheta',b.theta,css('--theta'));dbar('bAlpha','vAlpha',b.alpha,css('--alpha'));dbar('bBeta','vBeta',b.beta,css('--beta'))}
+function steps(i){[0,1,2].forEach(k=>{$('st'+k).className=k<i?'done':k===i?'on':''})}
+function showProduct(p){$('pimg').innerHTML=SVG[p.t](p.c);$('pimg').style.opacity=1;$('pname').textContent=p.n;$('pmeta').textContent=`${p.cat} · £${p.p}`}
+function verdict(v,p){const b=$('badge');if(v>HI){b.textContent='High interest · added to shortlist';b.className='badge pos';addCart(p,v)}
+ else if(v>MID){b.textContent='Moderate interest';b.className='badge mid'}else{b.textContent='Low interest';b.className='badge neg'}}
+function addCart(p,v){S.cart.push({p,v});const c=$('cart');if(S.cart.length===1)c.innerHTML='';
+ const d=document.createElement('div');d.className='li';d.innerHTML=`<div class="th">${SVG[p.t](p.c)}</div><div><div class="t">${p.n}</div><div class="s">${p.cat} · £${p.p}</div></div><div class="sc">${Math.round(v*100)}</div>`;c.appendChild(d);
+ $('cartN').textContent=S.cart.length+(S.cart.length===1?' item':' items');
+ if(S.cart.length>=3){const tot=S.cart.reduce((s,x)=>s+x.p.p,0),top=[...S.cart].sort((a,b)=>b.v-a.v)[0];
+  $('reflect').style.display='block';$('reflect').innerHTML=`<b>Before you check out:</b> ${S.cart.length} items, £${tot} total. Your strongest response was to the <b>${top.p.n}</b>. Consider starting with that one.`}}
+function stats(){const n=S.scores.length;$('trialN').textContent=`Trial ${S.trial} of ${S.total}`;$('avg').textContent=n?Math.round(S.scores.reduce((a,b)=>a+b,0)/n*100):'–';
+ const g=S.quality.filter(q=>q==='good').length;$('sq').textContent=`${g} / 8`;$('sq').style.color=g>=6?css('--pos'):css('--mid')}
+
+// demo loop
+let T=[];const later=(ms,f)=>T.push(setTimeout(f,ms));
+function runTrial(){if(S.mode!=='demo')return;if(S.trial>=S.total){steps(3);$('badge').textContent='Session complete';$('badge').className='badge neg';S.phase='idle';return}
+ const p=PRODUCTS[S.trial];S.like=Math.max(.05,Math.min(.97,[.9,.6,.2,.75,.35,.95,.15,.55,.3,.85][S.trial]+(Math.random()-.5)*.12));
+ S.phase='fix';steps(0);$('pimg').style.opacity=0;$('fix').classList.add('on');$('badge').textContent='';$('badge').className='badge';
+ later(1000,()=>{S.phase='view';steps(1);$('fix').classList.remove('on');showProduct(p);if(Math.random()<.3)S.blinkAt=(performance.now()-S.t0)/1000+1.5;
+  let k=0;const iv=setInterval(()=>{k++;const r=k/8;st=S.like*(.5+.5*r)+(Math.random()-.5)*.04;
+   S.bands={theta:(.15+.8*S.like)*r+(Math.random()-.5)*.06,alpha:-(.1+.6*S.like)*r+(Math.random()-.5)*.06,beta:(.05+.35*S.like)*r+(Math.random()-.5)*.06};updateBands();
+   S.alphaCh=CH.map(c=>/^(P|O)/.test(c)?.8-.6*S.like*r+Math.random()*.06:.3+Math.random()*.08);if(k>=8)clearInterval(iv)},500);T.push(iv);
+  later(4200,()=>{S.phase='rate';steps(2);st=S.like;S.scores.push(S.like);S.trial++;verdict(S.like,p);stats();later(2400,runTrial)})})}
+function stopAll(){T.forEach(t=>{clearTimeout(t);clearInterval(t)});T=[];if(S.ws){S.ws.onclose=null;S.ws.close();S.ws=null}}
+function reset(){S.trial=0;S.scores=[];S.cart=[];$('cart').innerHTML='<div class="empty">Items above the interest threshold appear here.</div>';$('cartN').textContent='0 items';$('reflect').style.display='none';S.t0=performance.now()}
+function demo(){stopAll();reset();S.mode='demo';S.quality=CH.map(()=>'good');$('status').classList.add('on');$('statusText').textContent='Demo · synthetic signal';
+ $('modeLbl').textContent='Simulated';$('acc').textContent='0.79';$('gain').textContent='+0.17';$('simNote').style.display='block';stats();runTrial()}
+
+// live
+let base=null;
+function connect(){stopAll();reset();S.mode='live';$('statusText').textContent='Connecting…';$('modeLbl').textContent='Live';$('simNote').style.display='none';$('acc').textContent='–';$('gain').textContent='–';
+ const ws=new WebSocket($('url').value.trim());S.ws=ws;
+ ws.onopen=()=>{$('status').classList.add('on');$('statusText').textContent='Live · '+$('url').value;steps(1)};
+ ws.onmessage=e=>{const f=JSON.parse(e.data);S.quality=f.quality;S.alphaCh=f.alpha_rel.map(v=>Math.min(1,v*2.2));
+  const s=f.summary||{},pa=s.posterior_alpha_rel??.2,th=f.theta_rel[0]??.2,ba=s.beta_alpha_ratio??1;
+  if(!base)base={pa,th,ba};base={pa:.95*base.pa+.05*pa,th:.95*base.th+.05*th,ba:.95*base.ba+.05*ba};
+  S.bands={theta:(th-base.th)/(base.th+1e-6),alpha:(pa-base.pa)/(base.pa+1e-6),beta:(ba-base.ba)/(base.ba+1e-6)};updateBands();
+  const z=1.5*S.bands.theta-1.5*S.bands.alpha+.5*S.bands.beta;st=1/(1+Math.exp(-z));S.phase='view';stats();
+  const amp=f.alpha.map(Math.sqrt);for(let k=0;k<62;k++){CH.forEach((c,i)=>S.buf[i][S.wi]=amp[i]*Math.sin(k*.9+i)*3+(Math.random()-.5)*8);S.wi=(S.wi+1)%1000}};
+ ws.onerror=()=>{$('statusText').textContent='Connection error'};ws.onclose=()=>{$('status').classList.remove('on');$('statusText').textContent='Disconnected'}}
+
+let last=performance.now();
+function loop(now){const t=(now-S.t0)/1000;$('clock').textContent=String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');
+ if(S.mode!=='live'){const n=Math.min(40,Math.round((now-last)/4));for(let k=0;k<n;k++){const v=synth(t-(n-k)*.004);CH.forEach((c,i)=>S.buf[i][S.wi]=v[i]);S.wi=(S.wi+1)%1000}}
+ last=now;drawEEG();drawTopo();tickScore();requestAnimationFrame(loop)}
+$('demoBtn').onclick=demo;$('connectBtn').onclick=connect;updateBands();stats();requestAnimationFrame(loop);
+const q=new URLSearchParams(location.search);if(q.get('theme'))document.documentElement.dataset.theme=q.get('theme');
+if(q.get('ws')){$('url').value=q.get('ws');connect()}else if(q.has('demo'))demo();
+</script>
+</body>
+</html>

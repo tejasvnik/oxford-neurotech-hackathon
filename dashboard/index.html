@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EEG Live Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --good: #3fb950; --warn: #d29922; --bad: #f85149; --flat: #6e7681;
+    --delta: #8b5cf6; --theta: #3b82f6; --alpha: #22c55e; --beta: #f59e0b; --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+           padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0 12px 0 0; font-weight: 600; }
+  .status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--flat); }
+  .dot.on { background: var(--good); box-shadow: 0 0 8px var(--good); }
+  input, button, select { background: var(--panel); color: var(--text); border: 1px solid var(--line);
+                  border-radius: 6px; padding: 6px 10px; font: inherit; }
+  button { cursor: pointer; } button:hover { border-color: var(--accent); }
+  button.primary { background: #238636; border-color: #2ea043; }
+  .spacer { flex: 1; }
+  main { display: grid; gap: 16px; padding: 16px 20px;
+         grid-template-columns: 300px 1fr 300px; grid-template-areas: "head bands meter" "trend trend trend"; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  #headCard { grid-area: head; } #bandsCard { grid-area: bands; } #meterCard { grid-area: meter; } #trendCard { grid-area: trend; }
+  canvas { width: 100%; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+                         margin-right: 5px; vertical-align: -1px; background: var(--c); }
+  .big { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .label { color: var(--muted); font-size: 12px; }
+  .bar { height: 14px; border-radius: 7px; background: #21262d; overflow: hidden; margin: 6px 0 14px; }
+  .bar > div { height: 100%; width: 0; transition: width .5s ease, background .5s; }
+  .warnbox { margin-top: 8px; padding: 8px 10px; border-radius: 6px; font-size: 12px;
+             background: rgba(210,153,34,.12); border: 1px solid rgba(210,153,34,.4); color: #e3b341; display: none; }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; grid-template-areas: "meter" "head" "bands" "trend"; padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 EEG Live</h1>
+  <span class="status"><span id="dot" class="dot"></span><span id="statusText">Disconnected</span></span>
+  <span class="spacer"></span>
+  <input id="url" value="ws://localhost:8765" size="22" aria-label="WebSocket URL">
+  <button id="connectBtn" class="primary">Connect</button>
+  <button id="demoBtn">Demo mode</button>
+</header>
+
+<main>
+  <section class="card" id="headCard">
+    <h2>Electrode quality</h2>
+    <canvas id="head" width="300" height="300"></canvas>
+    <div class="legend">
+      <span style="--c:var(--good)">good</span><span style="--c:var(--warn)">artefact</span>
+      <span style="--c:var(--bad)">noisy</span><span style="--c:var(--flat)">flat</span>
+    </div>
+  </section>
+
+  <section class="card" id="bandsCard">
+    <h2>Relative band power per channel</h2>
+    <canvas id="bands" width="700" height="300"></canvas>
+    <div class="legend">
+      <span style="--c:var(--delta)">δ 1–4 Hz</span><span style="--c:var(--theta)">θ 4–8 Hz</span>
+      <span style="--c:var(--alpha)">α 8–13 Hz</span><span style="--c:var(--beta)">β 13–30 Hz</span>
+    </div>
+  </section>
+
+  <section class="card" id="meterCard">
+    <h2>State</h2>
+    <div class="label">Relaxation (posterior α)</div>
+    <div class="big" id="relaxVal">–</div>
+    <div class="bar"><div id="relaxBar" style="background:var(--alpha)"></div></div>
+    <div class="label">Engagement (β / α)</div>
+    <div class="big" id="engVal">–</div>
+    <div class="bar"><div id="engBar" style="background:var(--beta)"></div></div>
+    <div class="label">Good channels</div>
+    <div class="big" id="goodVal">–</div>
+    <div class="warnbox" id="warn">Poor signal: re-seat electrodes before trusting these numbers.</div>
+  </section>
+
+  <section class="card" id="trendCard">
+    <h2>Last 60 s</h2>
+    <canvas id="trend" width="1200" height="180"></canvas>
+    <div class="legend">
+      <span style="--c:var(--alpha)">relaxation (posterior α rel)</span>
+      <span style="--c:var(--beta)">engagement (β/α, scaled)</span>
+      <span style="--c:var(--muted)">fraction good channels</span>
+    </div>
+  </section>
+</main>
+
+<script>
+// Unicorn Hybrid Black default positions (x, y on a unit head, nose up)
+const POS = { Fz:[0,-.45], C3:[-.5,0], Cz:[0,0], C4:[.5,0], Pz:[0,.42], PO7:[-.5,.62], Oz:[0,.82], PO8:[.5,.62] };
+const QCOL = { good:'--good', artefact:'--warn', noisy:'--bad', flat:'--flat' };
+const BANDS = ['delta','theta','alpha','beta'];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const history = [];   // {t, relax, eng, good}
+let ws = null, demoTimer = null, lastFrame = null;
+
+// --- HiDPI canvas setup ---
+function fit(c) {
+  const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  const w = Math.max(1, r.width), h = c.height / c.width * w;
+  c.style.height = h + 'px'; c.width = w * d; c.height = h * d;
+  const g = c.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); return [g, w, h];
+}
+
+function drawHead(f) {
+  const [g, w, h] = fit(document.getElementById('head'));
+  const cx = w / 2, cy = h / 2 + 6, R = Math.min(w, h) * 0.42;
+  g.strokeStyle = css('--line'); g.lineWidth = 2;
+  g.beginPath(); g.arc(cx, cy, R, 0, 2 * Math.PI); g.stroke();
+  g.beginPath(); g.moveTo(cx - 12, cy - R + 1); g.lineTo(cx, cy - R - 14); g.lineTo(cx + 12, cy - R + 1); g.stroke();
+  (f?.channels || Object.keys(POS)).forEach((ch, i) => {
+    const p = POS[ch] || [0, 0], x = cx + p[0] * R, y = cy + p[1] * R;
+    const q = f?.quality?.[i] || 'flat';
+    g.fillStyle = css(QCOL[q] || '--flat');
+    g.beginPath(); g.arc(x, y, 17, 0, 2 * Math.PI); g.fill();
+    g.fillStyle = '#0d1117'; g.font = '600 11px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(ch, x, y);
+  });
+}
+
+function drawBands(f) {
+  const [g, w, h] = fit(document.getElementById('bands'));
+  if (!f) return;
+  const n = f.channels.length, pad = 40, bw = (w - pad) / n, top = 8, bottom = h - 22, H = bottom - top;
+  g.strokeStyle = css('--line'); g.fillStyle = css('--muted'); g.font = '11px sans-serif';
+  [0, .5, 1].forEach(v => { const y = bottom - v * H; g.beginPath(); g.moveTo(pad, y); g.lineTo(w, y); g.stroke();
+    g.textAlign = 'right'; g.fillText((v * 100) + '%', pad - 4, y + 4); });
+  f.channels.forEach((ch, i) => {
+    let y = bottom; const x = pad + i * bw + bw * 0.15, W = bw * 0.7;
+    const rel = BANDS.map(b => f[b + '_rel']?.[i] ?? 0), s = rel.reduce((a, b) => a + b, 0) || 1;
+    BANDS.forEach((b, k) => { const hh = rel[k] / s * H; g.fillStyle = css('--' + b); g.fillRect(x, y - hh, W, hh); y -= hh; });
+    if (f.quality[i] !== 'good') { g.fillStyle = 'rgba(13,17,23,.6)'; g.fillRect(x, top, W, H); }
+    g.fillStyle = css('--text'); g.textAlign = 'center'; g.fillText(ch, x + W / 2, h - 6);
+  });
+}
+
+function drawTrend() {
+  const [g, w, h] = fit(document.getElementById('trend'));
+  if (history.length < 2) return;
+  const t1 = history[history.length - 1].t, t0 = t1 - 60;
+  const X = t => (t - t0) / 60 * w, Y = v => h - 6 - Math.max(0, Math.min(1, v)) * (h - 12);
+  g.strokeStyle = css('--line'); g.beginPath(); g.moveTo(0, Y(.5)); g.lineTo(w, Y(.5)); g.stroke();
+  const line = (key, col, scale = 1) => {
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); let started = false;
+    history.forEach(p => { const v = p[key]; if (v == null || p.t < t0) { started = false; return; }
+      const x = X(p.t), y = Y(v * scale); started ? g.lineTo(x, y) : g.moveTo(x, y); started = true; });
+    g.stroke();
+  };
+  line('good', css('--muted')); line('eng', css('--beta'), 1 / 3); line('relax', css('--alpha'));
+}
+
+function setMeter(id, barId, v, max, fmt) {
+  document.getElementById(id).textContent = v == null ? '–' : fmt(v);
+  document.getElementById(barId).style.width = v == null ? '0%' : Math.min(100, v / max * 100) + '%';
+}
+
+function onFrame(f) {
+  lastFrame = f;
+  const s = f.summary || {}, n = f.channels.length;
+  history.push({ t: f.t, relax: s.posterior_alpha_rel, eng: s.beta_alpha_ratio, good: s.n_good / n });
+  while (history.length > 120) history.shift();
+  setMeter('relaxVal', 'relaxBar', s.posterior_alpha_rel, 0.6, v => Math.round(v * 100) + '%');
+  setMeter('engVal', 'engBar', s.beta_alpha_ratio, 3, v => v.toFixed(2));
+  document.getElementById('goodVal').textContent = `${s.n_good}/${n}`;
+  document.getElementById('warn').style.display = s.n_good < n / 2 ? 'block' : 'none';
+  drawHead(f); drawBands(f); drawTrend();
+}
+
+function setStatus(on, text) {
+  document.getElementById('dot').classList.toggle('on', on);
+  document.getElementById('statusText').textContent = text;
+}
+
+function stopAll() {
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+  if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+}
+
+function connect() {
+  stopAll(); history.length = 0;
+  const url = document.getElementById('url').value.trim();
+  setStatus(false, 'Connecting…');
+  try { ws = new WebSocket(url); } catch (e) { setStatus(false, 'Bad URL'); return; }
+  ws.onopen = () => setStatus(true, 'Live: ' + url);
+  ws.onmessage = e => { try { onFrame(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+  ws.onerror = () => setStatus(false, 'Connection error');
+  ws.onclose = () => { setStatus(false, 'Disconnected, retrying…'); setTimeout(() => ws && connect(), 2000); };
+}
+
+// --- Demo mode: fake frames, eyes closed (alpha up) every other 20 s ---
+function demo() {
+  stopAll(); history.length = 0; setStatus(true, 'Demo mode (synthetic)');
+  const ch = Object.keys(POS); let t = 4;
+  demoTimer = setInterval(() => {
+    const closed = Math.floor(t / 20) % 2 === 1, f = { t, channels: ch, quality: [] };
+    BANDS.forEach(b => f[b + '_rel'] = []);
+    ch.forEach((c, i) => {
+      const post = /^(P|O)/.test(c), a = (closed && post ? 0.45 : 0.15) + Math.random() * 0.06;
+      const rel = { delta: 0.30 + Math.random() * .05, theta: 0.18, alpha: a, beta: 0.2 + Math.random() * .05 };
+      const s = Object.values(rel).reduce((x, y) => x + y);
+      BANDS.forEach(b => f[b + '_rel'].push(rel[b] / s));
+      f.quality.push(Math.random() < 0.06 ? 'artefact' : 'good');
+    });
+    const good = f.quality.map(q => q === 'good'), postIdx = ch.map((c, i) => /^(P|O)/.test(c) && good[i] ? i : -1).filter(i => i >= 0);
+    const pa = postIdx.reduce((s, i) => s + f.alpha_rel[i], 0) / postIdx.length;
+    const ba = ch.reduce((s, c, i) => s + f.beta_rel[i] / f.alpha_rel[i], 0) / ch.length;
+    f.summary = { n_good: good.filter(Boolean).length, posterior_alpha_rel: pa, beta_alpha_ratio: ba };
+    onFrame(f); t += 1;
+  }, 1000);
+}
+
+document.getElementById('connectBtn').onclick = connect;
+document.getElementById('demoBtn').onclick = demo;
+window.addEventListener('resize', () => { drawHead(lastFrame); drawBands(lastFrame); drawTrend(); });
+const q = new URLSearchParams(location.search);
+if (q.get('ws')) { document.getElementById('url').value = q.get('ws'); connect(); }
+else if (q.has('demo')) demo();
+else drawHead(null);
+</script>
+</body>
+</html>

@@ -14,11 +14,13 @@ Unicorn ─LSL─▶ input adapter ─▶ stateful filter (1–40 Hz + 50 Hz not
 ```bash
 pip install -r requirements.txt
 pytest -q                                                    # 7 tests
-python scripts/analyse_recording.py UnicornRecorder_*.csv    # quality report → reports/
+python scripts/analyse_recording.py data/raw/2026-11-07/UnicornRecorder_*.csv    # quality report → reports/
 python scripts/live.py --synthetic                           # fake live stream
-python scripts/live.py --replay UnicornRecorder_07_11_2026_17_30_360.csv --ws 8765
+python scripts/live.py --replay data/raw/2026-11-07/UnicornRecorder_07_11_2026_17_30_360.csv --ws 8765
 python scripts/live.py --lsl --ws 8765                       # on the headset laptop
 ```
+
+**Live dashboard:** open `dashboard/index.html` in a browser and click **Connect**, or add `?ws=ws://<laptop-ip>:8765` to the URL. Add `?demo` instead for a fake demo with no backend. It shows electrode quality on a head map, band power per channel, relaxation and engagement meters, and a 60 s trend. It also works on a phone.
 
 The app connects to `ws://<laptop-ip>:8765` and gets one JSON frame per second:
 
@@ -38,6 +40,7 @@ The app connects to `ws://<laptop-ip>:8765` and gets one JSON frame per second:
 | `eeg_pipeline/features.py` | Welch PSD and band power |
 | `eeg_pipeline/quality.py` | Per-channel `good / flat / noisy / artefact` |
 | `eeg_pipeline/pipeline.py` | `EEGPipeline.push(chunk)` → feature frames; `process_recording`, `run_live` |
+| `dashboard/index.html` | Live web dashboard (no install, reads the WebSocket, has a demo mode) |
 | `scripts/` | `analyse_recording.py` (report and plots), `live.py` (live stream and WebSocket) |
 
 ## Findings on the 7 Nov recordings
@@ -72,3 +75,12 @@ Until step 2 passes, we shouldn't claim the system detects relaxation or attenti
 - `StreamingFilter` is causal and keeps its state between chunks, so there's no look-ahead and no window-edge artefacts. The tests check that the output doesn't depend on chunk size and that later samples can't change earlier output.
 - The first 4 s after starting are skipped while the filter settles.
 - Don't commit identifiable participant data.
+
+## Data layout
+
+```
+data/raw/2026-11-07/   original Unicorn Recorder exports (.csv + .bdf), 5 sessions × 2 recorders
+data/raw/2026-11-08/   pilot 00:07 (150 s): clean signal (~10 µV, 97% clean windows), 11 Hz alpha peak ~95-125 s
+data/merged/           all sessions of each recorder in ONE csv (zipped; columns: session_start, source_file, time_s, EEG 1-8, TRIG)
+recordings/            new recordings from stream_unicorn.py (not committed)
+```

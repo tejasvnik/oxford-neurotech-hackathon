@@ -32,15 +32,19 @@ def load_unicorn_csv(path, cfg: PipelineConfig | None = None) -> Recording:
     """
     cfg = cfg or PipelineConfig()
     path = Path(path)
-    with open(path) as f:
-        header = [h.strip() for h in f.readline().split(",")]
-    raw = np.loadtxt(path, delimiter=",", skiprows=1, ndmin=2)
-    eeg_idx = [i for i, h in enumerate(header) if h.upper().startswith("EEG")]
-    trig_idx = next((i for i, h in enumerate(header) if h.upper().startswith("TRIG")), None)
-    if len(eeg_idx) != cfg.n_channels:
-        raise ValueError(f"{path.name}: expected {cfg.n_channels} EEG columns, found {len(eeg_idx)}")
-    trig = raw[:, trig_idx] if trig_idx is not None else np.zeros(len(raw))
-    return Recording(raw[:, eeg_idx].astype(float), cfg.fs, list(cfg.channel_names), trig, str(path))
+    import pandas as pd
+    df = pd.read_csv(path, low_memory=False)
+    df.columns = [c.strip() for c in df.columns]
+    eeg_cols = [c for c in df.columns if c.upper().startswith("EEG")]
+    if len(eeg_cols) != cfg.n_channels:
+        raise ValueError(f"{path.name}: expected {cfg.n_channels} EEG columns, found {len(eeg_cols)}")
+    if "TRIG" in [c.upper() for c in df.columns]:
+        trig = df[[c for c in df.columns if c.upper() == "TRIG"][0]].to_numpy(float)
+    elif "marker" in df.columns:  # stream_unicorn.py format: text markers -> 1 at marker samples
+        trig = df["marker"].notna().to_numpy(float)
+    else:
+        trig = np.zeros(len(df))
+    return Recording(df[eeg_cols].to_numpy(float), cfg.fs, list(cfg.channel_names), trig, str(path))
 
 
 def synthetic_eeg(duration_s=60.0, cfg: PipelineConfig | None = None, seed=0,

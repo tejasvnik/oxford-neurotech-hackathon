@@ -5,3 +5,8 @@ pytest
 # live only:
 pylsl
 websockets
+# MindCart:
+scikit-learn
+pandas
+pillow
+psychopy

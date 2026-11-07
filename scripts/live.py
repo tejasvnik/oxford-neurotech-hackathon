@@ -3,7 +3,7 @@
 On the headset laptop (stream from Unicorn via LSL):
     python scripts/live.py --lsl
 Anywhere else, without hardware (replays a recording at real-time speed):
-    python scripts/live.py --replay UnicornRecorder_07_11_2026_17_24_280.csv
+    python scripts/live.py --replay data/raw/2026-11-07/UnicornRecorder_07_11_2026_17_24_280.csv
     python scripts/live.py --synthetic
 Add --ws 8765 to broadcast each feature frame to ws://<this-ip>:8765 for the app.
 """
