@@ -72,3 +72,18 @@ Until step 2 passes, we shouldn't claim the system detects relaxation or attenti
 - `StreamingFilter` is causal and keeps its state between chunks, so there's no look-ahead and no window-edge artefacts. The tests check that the output doesn't depend on chunk size and that later samples can't change earlier output.
 - The first 4 s after starting are skipped while the filter settles.
 - Don't commit identifiable participant data.
+
+
+## Python visualiser
+
+Display the same filtered signal and feature frames as the existing pipeline in a local Matplotlib window:
+
+```bash
+python scripts/visualize.py --synthetic
+python scripts/visualize.py --replay UnicornRecorder_07_11_2026_17_30_360.csv
+python scripts/visualize.py --lsl
+```
+
+Close the window to stop. Use `--speed 10` to accelerate the synthetic demo or replay. The synthetic demo adds alpha at 20–40 s and 80–100 s of pipeline time. The top plot shows the latest two seconds of causal-filtered EEG, with a shared vertical scale and extremes clipped at the displayed scale. The bottom plot shows recent relative alpha power; gaps mean no posterior channels passed the quality check.
+
+The channel labels use simple amplitude thresholds: “good” does not prove clean EEG and can include blinks. “Receiving samples” only indicates that samples are arriving. Before interpreting an LSL stream, confirm its sample rate (250 Hz), units (µV) and channel order. This display cannot establish attention, relaxation, or clinical status.
